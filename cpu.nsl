@@ -1,0 +1,218 @@
+#include "cpu.h"
+
+module inc16
+{
+	func exe
+	{
+		return a + 1;
+	}
+}
+module alu16
+{
+	func exe
+	{
+		any
+		{
+			fn == 0x0:
+			{
+				q = 0;
+			}
+			fn == 0x1:
+			{
+				q = a;
+			}
+			fn == 0x2:
+			{
+				q = b;
+			}
+			fn == 0x3:
+			{
+				q = ~a;
+			}
+			fn == 0x4:
+			{
+				q = ~b;
+			}
+			fn == 0x5:
+			{
+				q = a & b;
+			}
+			fn == 0x6:
+			{
+				q = a | b;
+			}
+			fn == 0x7:
+			{
+				q = a ^ b;
+			}
+			fn == 0x8:
+			{
+				q = a + b;
+			}
+			fn == 0x9:
+			{
+				q = a - b;
+			}
+			fn == 0xa:
+			{
+				q = a * b;
+			}
+			fn == 0xb:
+			{
+				// Arithmatic right shift not implimented yet.
+				q = 0;
+			}
+			fn == 0xc:
+			{
+				q = {a[15], (a << b)[14:0]};
+			}
+			fn == 0xd:
+			{
+				q = a >> b;
+			}
+			fn == 0xe:
+			{
+				q = a << b;
+			}
+			fn == 0xf:
+			{
+				q = 0;
+			}
+		}
+	}
+	z = if(q == 0) 1'b1 else 1'b0;
+}
+module cpu16
+{
+	wire fn[4];
+	reg pc[16];
+	reg op[16];
+	reg im[16];
+	reg st[16];
+	reg rega[16];
+	reg regz;
+	proc_name start(pc);
+	proc_name ifetch(pc);
+	proc_name decode(op);
+	proc_name memory(im);
+	proc_name exec(im);
+	inc16 inc;
+	alu16 alu;
+
+	func startup
+	{
+		start();
+	}
+
+	proc start
+	{
+		rega := 0;
+		regz := 0;
+		op := 0;
+		st := 0;
+		im := 0;
+		ifetch(0);
+	}
+	proc ifetch
+	{
+		wire mdata[16];
+		
+		mdata = mread(pc);
+		if(mdata[15:12] == 0xf)
+		{
+			hlt();
+		}
+		else
+		{
+			decode(mdata);
+			pc := inc.exe(pc);
+		}
+	}
+	proc decode
+	{
+		if(op[15])
+		{
+			memory(mread(pc));
+		}
+		else
+		{
+			exec(mread(pc));	
+		}
+		pc := inc.exe(pc);
+	}
+	proc memory
+	{
+		exec(mread(im));
+	}
+	proc exec
+	{
+		wire newpc[16];
+
+		fn = op[3:0];	
+		alu.exe(rega, im, fn);
+		regz := alu.z;
+		newpc = alu.q;
+
+		any
+		{
+			//instruction with reg a
+			((op[15:12] == 0x1) || (op[15:12] == 0x9)):
+			{
+				rega := alu.q;
+				ifetch(pc);
+			}
+			//JMP
+			(op == 0x2002 || op == 0xa002):
+			{
+				ifetch(newpc);
+			}
+			//JZ
+			(op == 0x2102 || op == 0xa102):
+			{
+				if(regz == 1)
+				{
+					ifetch(newpc);
+				}
+				else
+				{
+					ifetch(pc);
+				}
+			}
+			//CALL
+			(op == 0x2012):
+			{
+				st := pc;
+				ifetch(newpc);
+			}
+			//STA
+			(op == 0x3000 || op == 0xb000):
+			{
+				mwrite(im, rega);	
+				ifetch(pc);
+			}
+			//RET
+			(op == 0x4000):
+			{
+				ifetch(st);
+			}
+		}
+
+	}
+#ifdef DEBUG_E
+	debug_z = 0;
+	debug_s = start;
+	debug_i = ifetch;
+	debug_d = decode;
+	debug_m = memory;
+	debug_x = exec;
+	debug_pc = pc;
+	debug_op = op;
+	debug_im = im;
+	debug_st = st;
+	debug_rega = rega;
+	debug_regz = regz;
+#endif
+
+		
+
+}

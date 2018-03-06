@@ -1,0 +1,78 @@
+#define DEBUG_E
+#include "cpu.nsl"
+#include "opcode.h"
+
+declare cpu_sim simulation{}
+module cpu_sim
+{
+	/*
+	mem memory[256][16] = {
+		LDAI, 2,
+		STAI, 100,
+		LDAI, 0,
+		STAI, 101,
+		LDA, 100,
+		SUAI, 1,
+		JZI, 22,
+		STAI, 100,
+		ADA, 101,
+		STAI, 101,
+		JMPI, 8,
+		HLT
+	};
+	*/
+	/*
+	mem memory[256][16] = {
+		LDAI, 0,
+		JZI, 4,
+		HLT
+	};
+	*/
+	/*
+	mem memory[256][16] = {
+		CALLI, 10,
+		HLT, 0,
+		0,0,
+		0,0,
+		0,0,
+		RET, 0
+	};
+	*/
+	mem memory[256][16] = {
+		LDAI, 2,
+		CALLI, 10,
+		CALLI, 10,
+		HLT, 0,
+		0,0,
+		SUAI, 1,
+		RET, 0
+	};
+
+	cpu16 cpu;
+
+	reg r = 0;
+
+	if(r != 1)
+	{
+		r := 1;
+		cpu.startup();
+	}
+
+
+
+	func cpu.mread
+	{
+		_display("READ: ADDRESS:%x DATA:%x A:%x", cpu.address, memory[cpu.address], cpu.debug_rega);
+		return memory[cpu.address];
+	}
+	func cpu.mwrite
+	{
+		_display("WRITE: ADDRESS:%x DATA:%x A:%x", cpu.address, cpu.datao, cpu.debug_rega);
+		memory[cpu.address] := cpu.datao;
+	}
+	func cpu.hlt
+	{
+		_finish("simulation finished");
+	}
+
+}
